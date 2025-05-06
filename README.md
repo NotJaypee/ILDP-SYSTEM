@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # 📚 ILDP-System
 
 This project was developed to streamline the generation of **Individual Learning and Development Plan (ILDP)** Learning Needs for **HR purposes**. The system produces an automated **Excel report 📊**, making it easier to consolidate training needs across employees.
