@@ -37,7 +37,7 @@ This project is a personal milestone and a stepping stone toward mastering **sof
 
 ---
 
-=======
+=================================================================================
 # learningneeds_summary
 
 A new Flutter project.
