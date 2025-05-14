@@ -62,10 +62,15 @@ class _InputPageState extends State<InputPage> {
 
   Future<List<String>> _fetchOfficeSuggestions() async {
     var offices = await DBHelper.getOffices();
+
     if (offices.isEmpty) {
       print("Warning: No office data found!");
       return []; // Return an empty list instead of null
     }
+
+    // Sort the offices alphabetically
+    offices.sort((a, b) => a.compareTo(b));
+
     return offices.cast<String>(); // Ensure it's a List<String>
   }
 
@@ -75,21 +80,28 @@ class _InputPageState extends State<InputPage> {
       print("Warning: No position data found!");
       return []; // Return an empty list instead of null
     }
+    positions.sort((a, b) => a.compareTo(b));
     return positions.cast<String>(); // Ensure it's a List<String>
   }
 
   Future<List<String>> _fetchLearningNeedsSuggestions() async {
     var learningNeeds = await DBHelper.getLearning_Needs();
+
+    learningNeeds.sort((a, b) => a.compareTo(b));
     return learningNeeds.isNotEmpty ? learningNeeds.cast<String>() : [];
   }
 
   Future<List<String>> _fetchBasisLearningSuggestions() async {
     var basisLearning = await DBHelper.getBasisLearning();
+
+    basisLearning.sort((a, b) => a.compareTo(b));
     return basisLearning.isNotEmpty ? basisLearning.cast<String>() : [];
   }
 
   Future<List<String>> _fetchProposedActionSuggestions() async {
     var proposedAction = await DBHelper.getProposedAction();
+
+    proposedAction.sort((a, b) => a.compareTo(b));
     return proposedAction.isNotEmpty ? proposedAction.cast<String>() : [];
   }
 
@@ -115,78 +127,99 @@ class _InputPageState extends State<InputPage> {
   }
 
 // Build an autocomplete text field
-  Widget _buildAutoCompleteField(String label, TextEditingController controller,
-      Future<List<String>> Function() fetchSuggestions) {
+  Widget _buildAutoCompleteField(
+    String label,
+    TextEditingController controller,
+    Future<List<String>> Function() fetchSuggestions,
+  ) {
     return FutureBuilder<List<String>>(
       future: fetchSuggestions(),
       builder: (context, snapshot) {
         List<String> suggestions = snapshot.data ?? [];
 
         return Autocomplete<String>(
-          optionsBuilder: (TextEditingValue textEditingValue) {
-            if (textEditingValue.text.isEmpty) {
-              return suggestions;
-            }
-            return suggestions.where((option) => option
-                .toLowerCase()
-                .contains(textEditingValue.text.toLowerCase()));
-          },
-          onSelected: (String selection) {
-            controller.text = selection;
-            FocusScope.of(context).unfocus(); // Hide keyboard
-          },
-          fieldViewBuilder: (BuildContext context,
-              TextEditingController textEditingController,
-              FocusNode focusNode,
-              VoidCallback onFieldSubmitted) {
-            textEditingController.text = controller.text;
+            optionsBuilder: (TextEditingValue textEditingValue) {
+          if (textEditingValue.text.isEmpty) {
+            return suggestions;
+          }
+          return suggestions.where((option) => option
+              .toLowerCase()
+              .contains(textEditingValue.text.toLowerCase()));
+        }, onSelected: (String selection) {
+          controller.text = selection;
+          FocusScope.of(context).unfocus(); // Hide keyboard
+        }, fieldViewBuilder: (BuildContext context,
+                TextEditingController textEditingController,
+                FocusNode focusNode,
+                VoidCallback onFieldSubmitted) {
+          textEditingController.text = controller.text;
 
-            return TextFormField(
-              controller: textEditingController,
-              focusNode: focusNode,
-              decoration: InputDecoration(
-                labelText: label,
-                border: const OutlineInputBorder(),
-                filled: true,
-                fillColor: Colors.grey[200],
-              ),
-              onChanged: (value) {
-                controller.text = value; // Capture manually typed value
-              },
-              onFieldSubmitted: (value) {
-                controller.text = value; // Save manually typed value on enter
-              },
-            );
-          },
-          optionsViewBuilder: (BuildContext context,
-              AutocompleteOnSelected<String> onSelected,
-              Iterable<String> options) {
-            return Align(
-              alignment: Alignment.topLeft,
-              child: Material(
-                elevation: 4.0,
-                borderRadius: BorderRadius.circular(10),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 200),
-                  child: ListView.builder(
-                    padding: EdgeInsets.zero,
-                    shrinkWrap: true,
-                    itemCount: options.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      final String option = options.elementAt(index);
-                      return ListTile(
-                        title: Text(option),
-                        onTap: () {
-                          onSelected(option);
-                        },
-                      );
-                    },
-                  ),
+          return TextFormField(
+            controller: textEditingController,
+            focusNode: focusNode,
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+              filled: true,
+              fillColor: Colors.grey[200],
+            ),
+            onChanged: (value) {
+              controller.text = value;
+            },
+            onFieldSubmitted: (value) {
+              controller.text = value;
+            },
+          );
+        }, optionsViewBuilder: (
+          BuildContext context,
+          AutocompleteOnSelected<String> onSelected,
+          Iterable<String> options,
+        ) {
+          // Determine the longest option to adjust the width
+          final longestOption = options.isEmpty
+              ? ''
+              : options.reduce((a, b) => a.length > b.length ? a : b);
+
+          // Increase the width for the dropdown (make it wider)
+          final estimatedWidth = (longestOption.length * 15.0)
+              .clamp(200.0, 800.0); // Adjusted the scale factor
+
+          // Calculate the height based on the number of options
+          final estimatedHeight = (options.length * 48.0)
+              .clamp(48.0, 200.0); // Each option ~48px tall (adjust if needed)
+
+          return Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 4.0,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: estimatedWidth, // Much wider width for the dropdown
+                height:
+                    estimatedHeight, // Dynamic height based on number of options
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  itemCount: options.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final String option = options.elementAt(index);
+                    return ListTile(
+                      title: SingleChildScrollView(
+                        scrollDirection:
+                            Axis.horizontal, // Allow horizontal scrolling
+                        child: Text(
+                          option,
+                          overflow: TextOverflow
+                              .ellipsis, // Prevent text from wrapping
+                        ),
+                      ),
+                      onTap: () => onSelected(option),
+                    );
+                  },
                 ),
               ),
-            );
-          },
-        );
+            ),
+          );
+        });
       },
     );
   }

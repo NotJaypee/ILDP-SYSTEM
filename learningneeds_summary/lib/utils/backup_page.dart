@@ -65,8 +65,8 @@ class BackupService {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: Row(
-            children: const [
+          title: const Row(
+            children: [
               Icon(Icons.check_circle, color: Colors.green),
               SizedBox(width: 8),
               Text('Export Successful'),
@@ -118,8 +118,12 @@ class BackupService {
     );
   }
 
-  static Future<void> importFromCSV(
+  static Future<void> updateFromCSV(
       BuildContext context, Function(bool) setLoading) async {
+    Set<String> employeesAdded = {};
+    Set<String> employeesSkipped = {};
+    int learningNeedsAdded = 0; // Declare it here
+
     // Start loading
     setLoading(true);
 
@@ -134,81 +138,167 @@ class BackupService {
       List<List<dynamic>> csvTable =
           const CsvToListConverter().convert(csvString, eol: '\n');
 
-      // Clear all existing records (employees and their learning needs)
-      await DBHelper.clearAllEmployeesAndLearningNeeds();
-
       for (int i = 1; i < csvTable.length; i++) {
         final row = csvTable[i];
 
-        // Skip rows with insufficient data
         if (row.length < 10) {
           print("Skipping row $i due to insufficient data");
           continue;
         }
 
-        String targetSchedule =
-            row[9]?.toString().trim() ?? ''; // Handle null or empty
+        String targetSchedule = row[9]?.toString().trim() ?? '';
         if (targetSchedule.isEmpty) {
-          targetSchedule = ''; // If there's no data, keep it empty
+          targetSchedule = '';
         } else if (targetSchedule.length == 3) {
-          targetSchedule =
-              '20' + targetSchedule; // Adding the century (e.g., 024 -> 2024)
+          targetSchedule = '20$targetSchedule';
         } else if (targetSchedule.length != 4) {
-          targetSchedule =
-              targetSchedule.padLeft(4, '0'); // Ensure proper padding
+          targetSchedule = targetSchedule.padLeft(4, '0');
         }
 
-        // Check if the employee already exists
+        String firstName = row[1].toString();
+        String middleInitial = row[2].toString();
+        String lastName = row[3].toString();
+        String fullName = '$firstName $middleInitial $lastName';
+
+        // Check if employee exists
         int? existingEmployeeId = await DBHelper.getEmployeeIdByName(
-          row[1], // First Name
-          row[3], // Last Name
+          firstName,
+          lastName,
         );
 
         int employeeId;
 
         if (existingEmployeeId != null) {
-          // Use the existing Employee_ID
           employeeId = existingEmployeeId;
-          print(
-              "Found existing employee: ${row[1]} ${row[3]} (ID: $employeeId)");
+          employeesSkipped.add(fullName);
+          print("Found existing employee: $fullName (ID: $employeeId)");
         } else {
-          // Insert the employee (only if not already present)
           employeeId = await DBHelper.insertEmployee({
-            'First_Name': row[1],
-            'Middle_Initial': row[2],
-            'Last_Name': row[3],
+            'First_Name': firstName,
+            'Middle_Initial': middleInitial,
+            'Last_Name': lastName,
             'Office': row[4],
             'Position': row[5],
           });
 
           if (employeeId > 0) {
-            print(
-                "Inserted new employee: ${row[1]} ${row[3]} (ID: $employeeId)");
+            employeesAdded.add(fullName);
+            print("Inserted new employee: $fullName (ID: $employeeId)");
           } else {
-            print("Failed to insert employee: ${row[1]} ${row[3]}");
+            print("Failed to insert employee: $fullName");
             continue;
           }
         }
 
-        // Insert learning needs for the employee
-        await DBHelper.insertLearningNeed({
-          'Employee_ID': employeeId,
-          'Learning_Needs': row[6],
-          'Basis_Learning': row[7],
-          'Proposed_Action': row[8],
-          'Target_Schedule': targetSchedule,
-        });
-        print("Inserted learning need for employee $employeeId: ${row[6]}");
+        // Check if learning need exists
+        bool exists = await DBHelper.learningNeedExists(
+          employeeId,
+          row[6],
+          row[7],
+          row[8],
+          targetSchedule,
+        );
+        // Add this before the for loop
+
+        if (!exists) {
+          await DBHelper.insertLearningNeed({
+            'Employee_ID': employeeId,
+            'Learning_Needs': row[6],
+            'Basis_Learning': row[7],
+            'Proposed_Action': row[8],
+            'Target_Schedule': targetSchedule,
+          });
+
+          learningNeedsAdded++; // ✅ Increment counter
+          print("Inserted new learning need for employee $employeeId");
+        } else {
+          print("Skipped existing learning need for employee $employeeId");
+        }
       }
 
       // End loading
       setLoading(false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Import successful!')),
-      );
+      // Show summary in dialog after a small delay to ensure the loading finishes
+      Future.delayed(const Duration(milliseconds: 200), () {
+        showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green, size: 30),
+                  SizedBox(width: 12),
+                  Text(
+                    'Update Complete',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+              content: Container(
+                width: 430, // Wider dialog
+                padding:
+                    const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '👥 Employees Added: ${employeesAdded.length}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '📄 Already Existing Employees: ${employeesSkipped.length}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '📝 Learning Needs Added: $learningNeedsAdded',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
+              ],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              contentPadding: const EdgeInsets.all(0),
+            );
+          },
+        );
+      });
     } else {
-      // End loading if no file is selected
+      // End loading if no file selected
       setLoading(false);
     }
   }

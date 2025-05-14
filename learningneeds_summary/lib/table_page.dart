@@ -6,6 +6,7 @@ import 'package:learningneeds_summary/screens/generate_page.dart';
 import 'package:learningneeds_summary/screens/edit_employee_page.dart';
 import 'title_page.dart';
 import 'package:learningneeds_summary/utils/backup_page.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 
 class TablePage extends StatefulWidget {
   @override
@@ -229,41 +230,39 @@ class _TablePageState extends State<TablePage> {
       ),
 
       // Floating Buttons for Import/Export
-      floatingActionButton: Stack(
+      floatingActionButton: SpeedDial(
+        icon: Icons.more_vert, // three-dot icon
+        activeIcon: Icons.close,
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        tooltip: 'Options',
+        overlayColor: Colors.black,
+        overlayOpacity: 0.5,
+        spacing: 12,
+        spaceBetweenChildren: 8,
         children: [
-          Positioned(
-            bottom: 16,
-            right: 16,
-            child: FloatingActionButton(
-              onPressed: () async {
-                await BackupService.exportToCSV(context);
-              },
-              child: const Icon(Icons.download),
-              backgroundColor: Colors.white,
-              tooltip: 'Export Data to CSV',
-            ),
+          SpeedDialChild(
+            child: const Icon(Icons.download),
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            label: 'Export Database to CSV',
+            onTap: () async {
+              await BackupService.exportToCSV(context);
+            },
           ),
-          Positioned(
-            bottom: 80,
-            right: 16,
-            child: FloatingActionButton(
-              onPressed: () async {
-                _showLoadingDialog(); // Show the loading popup
+          SpeedDialChild(
+            child: const Icon(Icons.system_update),
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            label: 'Update Database from CSV',
+            onTap: () async {
+              _showLoadingDialog();
 
-                await BackupService.importFromCSV(
-                  context,
-                  (isLoading) {},
-                );
+              await BackupService.updateFromCSV(context, (isLoading) {});
+              await _fetchData();
 
-                await _fetchData();
-
-                // Close loading popup
-                Navigator.of(context, rootNavigator: true).pop();
-              },
-              child: const Icon(Icons.upload),
-              backgroundColor: Colors.white,
-              tooltip: 'Import Data from CSV',
-            ),
+              Navigator.of(context, rootNavigator: true).pop();
+            },
           ),
         ],
       ),
@@ -282,7 +281,8 @@ class _TablePageState extends State<TablePage> {
     // Group data by Employee Name
     Map<String, List<Map<String, dynamic>>> groupedData = {};
     for (var item in sortedData) {
-      String key = "${item['First_Name']} ${item['Last_Name']}";
+      String key =
+          "${item['First_Name']} ${item['Middle_Initial']} ${item['Last_Name']}";
       groupedData.putIfAbsent(key, () => []).add(item);
     }
 

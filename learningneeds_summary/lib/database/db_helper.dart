@@ -88,6 +88,25 @@ class DBHelper {
     }
   }
 
+  static Future<bool> learningNeedExists(
+    int employeeId,
+    String learningNeed,
+    String basis,
+    String action,
+    String targetSchedule,
+  ) async {
+    final db = await DBHelper.database;
+
+    final result = await db.query(
+      'Employee_LearningNeeds',
+      where:
+          'Employee_ID = ? AND Learning_Needs = ? AND Basis_Learning = ? AND Proposed_Action = ? AND Target_Schedule = ?',
+      whereArgs: [employeeId, learningNeed, basis, action, targetSchedule],
+    );
+
+    return result.isNotEmpty;
+  }
+
   // Method to check if the employee exists and get their ID
   static Future<int?> getEmployeeIdByName(
       String firstName, String lastName) async {

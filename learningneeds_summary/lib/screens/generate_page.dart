@@ -6,6 +6,7 @@ import 'package:learningneeds_summary/title_page.dart';
 import 'input_page.dart';
 import 'package:learningneeds_summary/table_page.dart';
 import '../database/db_helper.dart';
+import 'package:dropdown_button2/dropdown_button2.dart';
 
 class GeneratePage extends StatefulWidget {
   @override
@@ -23,6 +24,8 @@ class _GeneratePageState extends State<GeneratePage> {
   List<Map<String, dynamic>> _data = [];
   List<String> learningNeeds = ['All', 'None'];
   List<String> offices = ['All', 'None'];
+  final TextEditingController _officeSearchController = TextEditingController();
+
   List<String> years = ['All'];
   List<String> quarters = ['All'];
   TextEditingController searchController = TextEditingController();
@@ -388,11 +391,13 @@ class _GeneratePageState extends State<GeneratePage> {
                                   searchController.text = selection;
                                 });
                               },
-                              fieldViewBuilder: (BuildContext context,
-                                  TextEditingController
-                                      fieldTextEditingController,
-                                  FocusNode fieldFocusNode,
-                                  VoidCallback onFieldSubmitted) {
+                              fieldViewBuilder: (
+                                BuildContext context,
+                                TextEditingController
+                                    fieldTextEditingController,
+                                FocusNode fieldFocusNode,
+                                VoidCallback onFieldSubmitted,
+                              ) {
                                 // Save the controller to update its text later
                                 searchController = fieldTextEditingController;
                                 return TextField(
@@ -401,7 +406,6 @@ class _GeneratePageState extends State<GeneratePage> {
                                   decoration: InputDecoration(
                                     labelText: 'Search Learning Need',
                                     border: const OutlineInputBorder(),
-                                    // Suffix icon that shows a dropdown of all options when tapped
                                     suffixIcon: Tooltip(
                                       message: 'Search for Learning Need',
                                       child: IconButton(
@@ -411,23 +415,20 @@ class _GeneratePageState extends State<GeneratePage> {
                                             isSearchIconPressed = true;
                                           });
 
-                                          // Hide the keyboard
                                           FocusScope.of(context).unfocus();
 
-                                          // Get the current position of the field
                                           final RenderBox renderBox = context
                                               .findRenderObject() as RenderBox;
                                           final Offset offset = renderBox
                                               .localToGlobal(Offset.zero);
 
-                                          // Show a popup menu with a customized width and height
                                           final String? selection =
                                               await showMenu<String>(
                                             context: context,
                                             position: RelativeRect.fromLTRB(
                                               offset.dx +
                                                   renderBox.size.width -
-                                                  50, // Adjust to position it on the right
+                                                  50,
                                               offset.dy + renderBox.size.height,
                                               offset.dx,
                                               offset.dy,
@@ -437,10 +438,8 @@ class _GeneratePageState extends State<GeneratePage> {
                                               return PopupMenuItem<String>(
                                                 value: option,
                                                 child: Container(
-                                                  width:
-                                                      250, // Custom width for the dropdown
-                                                  height:
-                                                      60, // Custom height for the menu items
+                                                  width: 250,
+                                                  height: 60,
                                                   child: Padding(
                                                     padding: const EdgeInsets
                                                         .symmetric(
@@ -461,10 +460,55 @@ class _GeneratePageState extends State<GeneratePage> {
                                             });
                                           }
 
-                                          // Reset the flag after the search is complete
                                           setState(() {
                                             isSearchIconPressed = false;
                                           });
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                              optionsViewBuilder: (
+                                BuildContext context,
+                                AutocompleteOnSelected<String> onSelected,
+                                Iterable<String> options,
+                              ) {
+                                final longestOption = options.isEmpty
+                                    ? ''
+                                    : options.reduce(
+                                        (a, b) => a.length > b.length ? a : b);
+
+                                final estimatedWidth =
+                                    (longestOption.length * 15.0)
+                                        .clamp(250.0, 700.0);
+                                final estimatedHeight =
+                                    (options.length * 56.0).clamp(56.0, 300.0);
+
+                                return Align(
+                                  alignment: Alignment.topLeft,
+                                  child: Material(
+                                    elevation: 4.0,
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Container(
+                                      width: estimatedWidth,
+                                      height: estimatedHeight,
+                                      child: ListView.builder(
+                                        padding: EdgeInsets.zero,
+                                        itemCount: options.length,
+                                        itemBuilder:
+                                            (BuildContext context, int index) {
+                                          final String option =
+                                              options.elementAt(index);
+                                          return ListTile(
+                                            title: Text(
+                                              option,
+                                              style:
+                                                  const TextStyle(fontSize: 16),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            onTap: () => onSelected(option),
+                                          );
                                         },
                                       ),
                                     ),
@@ -478,40 +522,95 @@ class _GeneratePageState extends State<GeneratePage> {
                               children: [
                                 // Office Dropdown
                                 Expanded(
-                                  child: DropdownButtonFormField<String>(
+                                  child: DropdownButtonFormField2<String>(
+                                    isExpanded: true,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Office',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    hint: const Text(
+                                      'Select an Office',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.normal,
+                                        color: Color.fromARGB(255, 70, 69,
+                                            69), // Darker color for text
+                                      ),
+                                    ),
                                     value: selectedOffice == null ||
                                             selectedOffice == 'Select an Office'
-                                        ? 'Select an Office'
+                                        ? null
                                         : selectedOffice,
                                     onChanged: (String? newValue) {
                                       setState(() {
                                         selectedOffice = newValue;
                                       });
                                     },
-                                    items: [
-                                      const DropdownMenuItem<String>(
-                                        value: 'Select an Office',
+                                    items: offices.map((String item) {
+                                      return DropdownMenuItem(
+                                        value: item,
                                         child: Text(
-                                          'Select an Office',
-                                          style: TextStyle(
-                                              fontWeight: FontWeight.normal),
+                                          item,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight
+                                                .normal, // Regular font weight
+                                            color: Colors
+                                                .black, // Set text color to black
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                        ),
+                                      );
+                                    }).toList(),
+                                    dropdownSearchData: DropdownSearchData(
+                                      searchController: _officeSearchController,
+                                      searchInnerWidgetHeight: 50,
+                                      searchInnerWidget: Padding(
+                                        padding: const EdgeInsets.all(8),
+                                        child: TextField(
+                                          controller: _officeSearchController,
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            contentPadding:
+                                                const EdgeInsets.all(12),
+                                            hintText: 'Search Office...',
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight
+                                                .normal, // Regular font weight
+                                            color: Colors
+                                                .black, // Set text color to black
+                                          ),
+                                          onChanged:
+                                              (value) {}, // Trigger re-filtering
                                         ),
                                       ),
-                                      ...offices.map<DropdownMenuItem<String>>(
-                                          (String value) {
-                                        return DropdownMenuItem<String>(
-                                          value: value,
-                                          child: Text(
-                                            value,
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.normal),
-                                          ),
-                                        );
-                                      }).toList(),
-                                    ],
-                                    decoration: const InputDecoration(
-                                      labelText: 'Office',
-                                      border: OutlineInputBorder(),
+                                      searchMatchFn: (item, searchValue) {
+                                        return item.value
+                                            .toString()
+                                            .toLowerCase()
+                                            .contains(
+                                                searchValue.toLowerCase());
+                                      },
+                                    ),
+                                    buttonStyleData: const ButtonStyleData(
+                                      padding:
+                                          EdgeInsets.symmetric(horizontal: 14),
+                                    ),
+                                    dropdownStyleData: DropdownStyleData(
+                                      maxHeight:
+                                          300, // Ensure this is set for scrolling if there are many items
+                                      width: 570, // Width of the dropdown
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    menuItemStyleData: const MenuItemStyleData(
+                                      padding:
+                                          EdgeInsets.symmetric(horizontal: 16),
                                     ),
                                   ),
                                 ),
@@ -520,7 +619,9 @@ class _GeneratePageState extends State<GeneratePage> {
                                     width: 10), // Spacing between dropdowns
 
                                 // Year Dropdown
-                                Expanded(
+                                SizedBox(
+                                  width:
+                                      300, // Controls both field and dropdown width
                                   child: DropdownButtonFormField<String>(
                                     value: selectedYear,
                                     onChanged: (String? newValue) {
@@ -532,7 +633,13 @@ class _GeneratePageState extends State<GeneratePage> {
                                         (String value) {
                                       return DropdownMenuItem<String>(
                                         value: value,
-                                        child: Text(value),
+                                        child: Text(
+                                          value,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.normal),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                        ),
                                       );
                                     }).toList(),
                                     decoration: const InputDecoration(
@@ -541,10 +648,13 @@ class _GeneratePageState extends State<GeneratePage> {
                                     ),
                                   ),
                                 ),
+
                                 const SizedBox(width: 10),
 
                                 // Quarter Dropdown
-                                Expanded(
+                                SizedBox(
+                                  width:
+                                      300, // Adjust this to control dropdown width
                                   child: DropdownButtonFormField<String>(
                                     value: selectedQuarter,
                                     onChanged: (String? newValue) {
@@ -557,7 +667,13 @@ class _GeneratePageState extends State<GeneratePage> {
                                             (String value) {
                                       return DropdownMenuItem<String>(
                                         value: value,
-                                        child: Text(value),
+                                        child: Text(
+                                          value,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.normal),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                        ),
                                       );
                                     }).toList(),
                                     decoration: const InputDecoration(
